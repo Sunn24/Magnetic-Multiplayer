@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Magnetic Game</title>
+<style>
+  :root{
+    --bg-deep:      #0e1016;
+    --bg-panel:     #161a24;
+    --grid-line:    #2a3040;
+    --dot-open:     #4b5468;
+    --dot-blocked:  #000000;
+    --dot-blocked-ring: #454b5e;
+    --pole-red:     #ff4d5e;
+    --pole-glow:    #ff8a94;
+    --pole-blue:    #4d8dff;
+    --pole-blue-glow: #8ab4ff;
+    --text-main:    #e7e9f0;
+    --text-dim:     #7d8496;
+    --accent-cyan:  #4de0ff;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-deep);
+    color: var(--text-main);
+    font-family: 'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #app{
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  canvas{
+    display: block;
+    touch-action: none;
+  }
+
+  .hud{
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .hud-top-left{
+    top: clamp(14px, 3vw, 30px);
+    left: clamp(14px, 3vw, 30px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(10px, 1.6vw, 16px);
+    pointer-events: auto;
+  }
+
+  .control-row{
+    display: flex;
+    align-items: center;
+    gap: clamp(8px, 1.2vw, 12px);
+  }
+
+  .control-row .label{
+    font-size: clamp(11px, 1.4vw, 14px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    width: clamp(90px, 11vw, 130px);
+  }
+
+  .stepper{
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 9px;
+    overflow: hidden;
+  }
+
+  .stepper button{
+    pointer-events: auto;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: clamp(15px, 1.8vw, 19px);
+    font-weight: 700;
+    width: clamp(28px, 3.4vw, 34px);
+    height: clamp(28px, 3.4vw, 34px);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .stepper button:hover{
+    background: var(--pole-red);
+    color: #1a0a0c;
+  }
+
+  .stepper button:disabled{
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .stepper button:disabled:hover{
+    background: transparent;
+    color: var(--text-main);
+  }
+
+  .stepper .value{
+    min-width: clamp(34px, 3.6vw, 42px);
+    text-align: center;
+    font-size: clamp(14px, 1.8vw, 18px);
+    font-weight: 600;
+    color: var(--accent-cyan);
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    padding: 0;
+    -moz-appearance: textfield;
+  }
+  .stepper .value::-webkit-outer-spin-button,
+  .stepper .value::-webkit-inner-spin-button{
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .stepper .value:focus{
+    color: var(--text-main);
+  }
+
+  .hud-top-right{
+    top: clamp(14px, 3vw, 30px);
+    right: clamp(14px, 3vw, 30px);
+    text-align: right;
+  }
+
+  .hud-top-right .label{
+    font-size: clamp(11px, 1.4vw, 14px);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .hud-top-right .count{
+    font-size: clamp(28px, 5vw, 44px);
+    font-weight: 700;
+    color: var(--pole-red);
+    text-shadow: 0 0 18px rgba(255,77,94,0.45);
+    line-height: 1.1;
+  }
+
+  .btn{
+    position: absolute;
+    pointer-events: auto;
+    border: none;
+    border-radius: 10px;
+    font-family: inherit;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  }
+
+  .btn:active{ transform: scale(0.96); }
+
+  #resetBtn{
+    bottom: clamp(20px, 4vw, 34px);
+    right: clamp(20px, 4vw, 34px);
+    padding: clamp(12px, 1.8vw, 16px) clamp(22px, 3vw, 34px);
+    font-size: clamp(14px, 1.8vw, 18px);
+    background: var(--pole-red);
+    color: #1a0a0c;
+    box-shadow: 0 0 0 rgba(255,77,94,0);
+  }
+  #resetBtn:hover{
+    background: var(--pole-glow);
+    box-shadow: 0 4px 22px rgba(255,77,94,0.5);
+  }
+
+  #saveBtn{
+    bottom: clamp(20px, 4vw, 34px);
+    right: calc(clamp(20px, 4vw, 34px) + clamp(110px, 14vw, 160px));
+    padding: clamp(12px, 1.8vw, 16px) clamp(22px, 3vw, 34px);
+    font-size: clamp(14px, 1.8vw, 18px);
+    background: var(--bg-panel);
+    color: var(--accent-cyan);
+    border: 1px solid var(--grid-line);
+  }
+  #saveBtn:hover{
+    box-shadow: 0 4px 22px rgba(77,224,255,0.35);
+  }
+  #saveBtn:disabled{
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  #leaderboardBtn{
+    top: clamp(14px, 3vw, 30px);
+    right: clamp(14px, 3vw, 30px);
+    transform: translateY(calc(-100% - 12px));
+    padding: 8px 16px;
+    font-size: clamp(12px, 1.4vw, 14px);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    border: 1px solid var(--grid-line);
+  }
+  #leaderboardBtn:hover{
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+  }
+
+  #multiplayerToggleBtn{
+    bottom: clamp(20px, 4vw, 34px);
+    left: clamp(14px, 3vw, 30px);
+    padding: 10px 18px;
+    font-size: clamp(12px, 1.4vw, 14px);
+    background: var(--bg-panel);
+    color: var(--pole-blue);
+    border: 1px solid var(--grid-line);
+  }
+  #multiplayerToggleBtn:hover{
+    border-color: var(--pole-blue);
+    box-shadow: 0 4px 22px rgba(77,141,255,0.35);
+  }
+
+  #leaveRoomBtn{
+    bottom: clamp(20px, 4vw, 34px);
+    right: clamp(20px, 4vw, 34px);
+    padding: clamp(12px, 1.8vw, 16px) clamp(22px, 3vw, 34px);
+    font-size: clamp(14px, 1.8vw, 18px);
+    background: var(--bg-panel);
+    color: var(--text-dim);
+    border: 1px solid var(--grid-line);
+  }
+  #leaveRoomBtn:hover{
+    border-color: var(--pole-red);
+    color: var(--pole-red);
+  }
+
+  .panel{
+    position: absolute;
+    pointer-events: auto;
+    background: var(--bg-panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  #leaderboardPanel{
+    top: clamp(58px, 8vw, 78px);
+    right: clamp(14px, 3vw, 30px);
+    width: clamp(220px, 26vw, 300px);
+    max-height: 56vh;
+    padding: 14px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #leaderboardPanel.open{ display: flex; }
+
+  #leaderboardPanel h3{
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  #leaderboardList{
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow-y: auto;
+  }
+
+  #leaderboardList li{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+  }
+  #leaderboardList li .row-main{
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  #leaderboardList li .rk{ color: var(--text-dim); width: 20px; }
+  #leaderboardList li .nm{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #leaderboardList li .sc{ color: var(--pole-red); font-weight: 700; }
+  #leaderboardList li .meta{
+    font-size: 11px;
+    color: var(--text-dim);
+    padding-left: 20px;
+    letter-spacing: 0.02em;
+  }
+  #leaderboardList .empty, #leaderboardList .loading{
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  /* ---------- Multiplayer HUD ---------- */
+  #mpHud{
+    top: clamp(14px, 3vw, 30px);
+    left: clamp(14px, 3vw, 30px);
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: auto;
+    background: var(--bg-panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 14px;
+    padding: 14px 18px;
+    min-width: 220px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  #mpHud.show{ display: flex; }
+  #mpHud .room-code{
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+  #mpHud .room-code b{
+    color: var(--accent-cyan);
+    font-size: 13px;
+    letter-spacing: 0.12em;
+  }
+  .mp-player-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+  }
+  .mp-player-row.active-turn{
+    background: rgba(77,224,255,0.08);
+    box-shadow: inset 0 0 0 1px rgba(77,224,255,0.35);
+  }
+  .mp-dot{
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .mp-dot.p1{ background: var(--pole-red); box-shadow: 0 0 8px rgba(255,77,94,0.6); }
+  .mp-dot.p2{ background: var(--pole-blue); box-shadow: 0 0 8px rgba(77,141,255,0.6); }
+  .mp-player-name{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mp-player-score{ font-weight: 700; color: var(--text-main); }
+  #mpTurnStatus{
+    font-size: 12px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.02em;
+    min-height: 16px;
+  }
+
+  .modal-overlay{
+    position: fixed;
+    inset: 0;
+    background: rgba(6,7,11,0.72);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    pointer-events: auto;
+  }
+  .modal-overlay.open{ display: flex; }
+
+  .modal-box{
+    background: var(--bg-panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 16px;
+    padding: 24px;
+    width: min(90vw, 360px);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  .modal-box h3{
+    margin: 0;
+    font-size: 16px;
+  }
+  .modal-box p{
+    margin: 0;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .modal-box input{
+    background: var(--bg-deep);
+    border: 1px solid var(--grid-line);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 15px;
+    padding: 10px 12px;
+    outline: none;
+  }
+  .modal-box input:focus{ border-color: var(--accent-cyan); }
+
+  .modal-actions{
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  .modal-actions button{
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-ghost{
+    background: transparent;
+    color: var(--text-dim);
+  }
+  .btn-primary{
+    background: var(--pole-red);
+    color: #1a0a0c;
+  }
+  .btn-primary-blue{
+    background: var(--pole-blue);
+    color: #08101f;
+  }
+  .modal-actions button:disabled{
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .modal-status{
+    font-size: 12px;
+    color: var(--text-dim);
+    min-height: 16px;
+  }
+
+  .mode-choice-row{
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mode-choice-btn{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--grid-line);
+    background: var(--bg-deep);
+    color: var(--text-main);
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .mode-choice-btn:hover{ border-color: var(--accent-cyan); }
+  .mode-choice-btn strong{ font-size: 14px; }
+  .mode-choice-btn span{ font-size: 12px; color: var(--text-dim); }
+
+  .tab-row{
+    display: flex;
+    gap: 6px;
+    background: var(--bg-deep);
+    border-radius: 9px;
+    padding: 3px;
+    border: 1px solid var(--grid-line);
+  }
+  .tab-btn{
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 0;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .tab-btn.active{
+    background: var(--bg-panel);
+    color: var(--accent-cyan);
+  }
+  .tab-panel{ display: none; flex-direction: column; gap: 12px; }
+  .tab-panel.active{ display: flex; }
+
+  .room-code-display{
+    text-align: center;
+    font-size: clamp(26px, 6vw, 34px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--accent-cyan);
+    background: var(--bg-deep);
+    border: 1px dashed var(--grid-line);
+    border-radius: 10px;
+    padding: 14px 10px;
+  }
+
+  .share-row{
+    display: flex;
+    gap: 8px;
+  }
+  .share-row button{
+    flex: 1;
+    border: 1px solid var(--grid-line);
+    background: var(--bg-deep);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .share-row button:hover{ border-color: var(--accent-cyan); color: var(--accent-cyan); }
+
+  .waiting-spinner{
+    align-self: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .result-scores{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .result-score-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    font-size: 14px;
+  }
+  .result-score-row.winner{
+    box-shadow: inset 0 0 0 1px var(--accent-cyan);
+  }
+  .result-score-row .name{ flex: 1; }
+  .result-score-row .score{ font-weight: 700; font-size: 18px; }
+
+  .footer-note{
+    position: absolute;
+    bottom: clamp(20px, 4vw, 34px);
+    left: clamp(14px, 3vw, 30px);
+    font-size: clamp(11px, 1.3vw, 13px);
+    color: var(--text-dim);
+    pointer-events: none;
+    max-width: 44vw;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="board"></canvas>
+
+  <div class="hud hud-top-left single-only" id="singleControls">
+    <div class="control-row">
+      <span class="label">Grid size</span>
+      <div class="stepper">
+        <button id="gridMinus" type="button" aria-label="ลดขนาดกริด">−</button>
+        <input class="value" id="gridSizeVal" type="number" inputmode="numeric" value="5" min="2" max="24" aria-label="ขนาดกริด">
+        <button id="gridPlus" type="button" aria-label="เพิ่มขนาดกริด">+</button>
+      </div>
+    </div>
+    <div class="control-row">
+      <span class="label">magnet distance</span>
+      <div class="stepper">
+        <button id="distMinus" type="button" aria-label="ลดระยะ">−</button>
+        <input class="value" id="distVal" type="number" inputmode="numeric" value="2" min="1" max="8" aria-label="ระยะ magnet distance">
+        <button id="distPlus" type="button" aria-label="เพิ่มระยะ">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud mpHud" id="mpHud">
+    <div class="room-code">ROOM <b id="mpRoomCodeLabel">------</b></div>
+    <div class="mp-player-row" id="mpRow1">
+      <span class="mp-dot p1"></span>
+      <span class="mp-player-name" id="mpName1">ผู้เล่น 1</span>
+      <span class="mp-player-score" id="mpScore1">0</span>
+    </div>
+    <div class="mp-player-row" id="mpRow2">
+      <span class="mp-dot p2"></span>
+      <span class="mp-player-name" id="mpName2">ผู้เล่น 2</span>
+      <span class="mp-player-score" id="mpScore2">0</span>
+    </div>
+    <div id="mpTurnStatus"></div>
+  </div>
+
+  <div class="hud hud-top-right single-only" id="counterHud">
+    <div class="label">magnet</div>
+    <div class="count" id="counter">0</div>
+  </div>
+
+  <button id="leaderboardBtn" class="btn single-only">🏆 Leaderboard</button>
+  <div id="leaderboardPanel" class="panel single-only">
+    <h3>Top magnet <span id="leaderboardRefresh" style="cursor:pointer;color:var(--accent-cyan);font-size:12px;">↻</span></h3>
+    <ul id="leaderboardList"><li class="loading">กำลังโหลด…</li></ul>
+  </div>
+
+  <button id="multiplayerToggleBtn" class="btn single-only">👥 เล่น 2 คนออนไลน์</button>
+  <button id="saveBtn" class="btn single-only" disabled>Save Record</button>
+  <button id="resetBtn" class="btn single-only">Reset</button>
+  <button id="leaveRoomBtn" class="btn multi-only">ออกจากห้อง</button>
+  <div class="footer-note" id="footerNote">คลิกจุดสีเทาเพื่อวางขั้วแม่เหล็ก · จุดที่อยู่ใกล้กันเกินไปจะถูกล็อกเป็นสีดำ</div>
+
+  <!-- ============ Save score modal (single player) ============ -->
+  <div class="modal-overlay" id="saveModal">
+    <div class="modal-box">
+      <h3>บันทึกคะแนน</h3>
+      <p>คะแนนปัจจุบัน: <strong id="modalScorePreview">0</strong> magnet (grid <span id="modalGridPreview">5</span>, distance <span id="modalDistPreview">2</span>)</p>
+      <input id="modalNameInput" type="text" placeholder="ชื่อผู้เล่น" maxlength="20" autocomplete="off">
+      <div class="modal-status" id="modalStatus"></div>
+      <div class="modal-actions">
+        <button id="modalCancel" class="btn-ghost" type="button">ยกเลิก</button>
+        <button id="modalConfirm" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Generic confirm modal ============ -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box">
+      <h3 id="confirmTitle">ยืนยันการทำรายการ?</h3>
+      <p id="confirmMessage"></p>
+      <div class="modal-actions">
+        <button id="confirmCancelBtn" class="btn-ghost" type="button">ยกเลิก</button>
+        <button id="confirmOkBtn" class="btn-primary" type="button">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Mode select modal ============ -->
+  <div class="modal-overlay open" id="modeModal">
+    <div class="modal-box">
+      <h3>เลือกโหมดการเล่น</h3>
+      <p>Magnetic Game — วางขั้วแม่เหล็กบนกริดโดยไม่ให้อยู่ใกล้กันเกินไป</p>
+      <div class="mode-choice-row">
+        <button class="mode-choice-btn" id="chooseSingleBtn" type="button">
+          <strong>🧲 เล่นคนเดียว</strong>
+          <span>ทำคะแนนสูงสุด บันทึกลงลีดเดอร์บอร์ด</span>
+        </button>
+        <button class="mode-choice-btn" id="chooseMultiBtn" type="button">
+          <strong>👥 เล่น 2 คนออนไลน์</strong>
+          <span>ผลัดกันวางเสาแม่เหล็ก แข่งกันบนกระดานเดียวกันผ่านรหัสห้อง</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Multiplayer setup modal (create / join) ============ -->
+  <div class="modal-overlay" id="mpModal">
+    <div class="modal-box">
+      <h3>เล่น 2 คนออนไลน์</h3>
+      <div class="tab-row">
+        <button class="tab-btn active" id="tabCreateBtn" type="button">สร้างห้อง</button>
+        <button class="tab-btn" id="tabJoinBtn" type="button">เข้าร่วมห้อง</button>
+      </div>
+
+      <div class="tab-panel active" id="tabCreatePanel">
+        <input id="createNameInput" type="text" placeholder="ชื่อของคุณ (ผู้เล่น 1)" maxlength="16" autocomplete="off">
+        <div class="control-row">
+          <span class="label">Grid size</span>
+          <div class="stepper">
+            <button id="mpGridMinus" type="button">−</button>
+            <input class="value" id="mpGridVal" type="number" inputmode="numeric" value="5" min="2" max="24">
+            <button id="mpGridPlus" type="button">+</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <span class="label">magnet distance</span>
+          <div class="stepper">
+            <button id="mpDistMinus" type="button">−</button>
+            <input class="value" id="mpDistVal" type="number" inputmode="numeric" value="2" min="1" max="8">
+            <button id="mpDistPlus" type="button">+</button>
+          </div>
+        </div>
+        <div class="modal-status" id="createStatus"></div>
+        <div class="modal-actions">
+          <button id="mpCreateCancelBtn" class="btn-ghost" type="button">ยกเลิก</button>
+          <button id="mpCreateConfirmBtn" class="btn-primary-blue" type="button">สร้างห้อง</button>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tabJoinPanel">
+        <input id="joinNameInput" type="text" placeholder="ชื่อของคุณ (ผู้เล่น 2)" maxlength="16" autocomplete="off">
+        <input id="joinCodeInput" type="text" placeholder="รหัสห้อง เช่น A3F9K2" maxlength="8" autocomplete="off" style="text-transform:uppercase;letter-spacing:0.1em;">
+        <div class="modal-status" id="joinStatus"></div>
+        <div class="modal-actions">
+          <button id="mpJoinCancelBtn" class="btn-ghost" type="button">ยกเลิก</button>
+          <button id="mpJoinConfirmBtn" class="btn-primary-blue" type="button">เข้าร่วม</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Waiting for player 2 modal ============ -->
+  <div class="modal-overlay" id="waitingModal">
+    <div class="modal-box">
+      <h3>ห้องพร้อมแล้ว รอเพื่อนเข้าร่วม</h3>
+      <div class="room-code-display" id="waitingRoomCode">------</div>
+      <div class="share-row">
+        <button id="copyCodeBtn" type="button">📋 คัดลอกรหัสห้อง</button>
+        <button id="copyLinkBtn" type="button">🔗 คัดลอกลิงก์เชิญ</button>
+      </div>
+      <p>ส่งรหัสห้องหรือลิงก์เชิญให้เพื่อน แล้วให้เพื่อนกด "เข้าร่วมห้อง"</p>
+      <div class="waiting-spinner" id="waitingSpinner">กำลังรอผู้เล่นคนที่ 2 …</div>
+      <div class="modal-actions">
+        <button id="waitingCancelBtn" class="btn-ghost" type="button">ยกเลิกห้อง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Result modal (multiplayer) ============ -->
+  <div class="modal-overlay" id="resultModal">
+    <div class="modal-box">
+      <h3 id="resultTitle">จบเกม!</h3>
+      <div class="result-scores" id="resultScores"></div>
+      <div class="modal-actions">
+        <button id="resultCloseBtn" class="btn-ghost" type="button">ปิด</button>
+        <button id="resultNewRoomBtn" class="btn-primary-blue" type="button">สร้างห้องใหม่</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Toast ============ -->
+  <div id="toast" style="position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);background:var(--bg-panel);border:1px solid var(--grid-line);color:var(--text-main);padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.2s ease, transform 0.2s ease;z-index:30;"></div>
+</div>
+
+<script type="module">
+  // ======================================================================
+  // FIREBASE SETUP — ใส่ config ของโปรเจกต์ Firebase ของคุณเองตรงนี้
+  // ต้องเปิดใช้งาน Firestore Database (Build → Firestore Database → Create database)
+  // ======================================================================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, query, orderBy, limit, getDocs, serverTimestamp,
+    doc, setDoc, getDoc, updateDoc, onSnapshot, runTransaction
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDn4U882NF5R6yr1mSxTKhOVJTHucpJV9A",
+    authDomain: "magnetic-game.firebaseapp.com",
+    projectId: "magnetic-game",
+    storageBucket: "magnetic-game.firebasestorage.app",
+    messagingSenderId: "1049221356346",
+    appId: "1:1049221356346:web:c98c9ed11ab12e0a94ce03",
+    measurementId: "G-GW2CRMPM7X"
+  };
+
+  let db = null;
+  let firebaseReady = false;
+  try {
+    const fbApp = initializeApp(firebaseConfig);
+    db = getFirestore(fbApp);
+    firebaseReady = true;
+  } catch (err) {
+    console.warn("Firebase ยังไม่ได้ตั้งค่า — ใส่ firebaseConfig ของคุณก่อนใช้งานระบบบันทึกคะแนน / ห้องออนไลน์", err);
+  }
+
+  const SCORES_COLLECTION = "magnet_scores";
+  const ROOMS_COLLECTION = "magnet_rooms";
+
+  async function saveRecordToFirebase(name, score, gridSizeVal, distanceVal){
+    if (!db) throw new Error("Firebase ยังไม่ได้ตั้งค่า config");
+    await addDoc(collection(db, SCORES_COLLECTION), {
+      name: name.slice(0, 20),
+      score,
+      gridSize: gridSizeVal,
+      distance: distanceVal,
+      createdAt: serverTimestamp()
+    });
+  }
+
+  async function loadTopRecords(topN = 10){
+    if (!db) throw new Error("Firebase ยังไม่ได้ตั้งค่า config");
+    const q = query(collection(db, SCORES_COLLECTION), orderBy("score", "desc"), limit(topN));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => d.data());
+  }
+
+  (function(){
+  "use strict";
+
+  // ---------- Config ----------
+  const GRID_MIN = 2, GRID_MAX = 24;
+  const DIST_MIN = 1, DIST_MAX = 8;
+
+  let M = 5;
+  let N = M - 1;
+  let MIN_RED_DISTANCE = 2;
+  const DOT_RADIUS = 6;
+  const CLICK_RADIUS = 16;
+
+  // App mode: 'single' | 'multi'
+  let appMode = 'single';
+
+  // ---------- DOM refs (shared) ----------
+  const gridSizeLabel = document.getElementById('gridSizeVal');
+  const distLabel = document.getElementById('distVal');
+  const gridMinusBtn = document.getElementById('gridMinus');
+  const gridPlusBtn = document.getElementById('gridPlus');
+  const distMinusBtn = document.getElementById('distMinus');
+  const distPlusBtn = document.getElementById('distPlus');
+  const saveBtn = document.getElementById('saveBtn');
+  const footerNote = document.getElementById('footerNote');
+  const toastEl = document.getElementById('toast');
+
+  function showToast(msg, ms = 2200){
+    toastEl.textContent = msg;
+    toastEl.style.opacity = '1';
+    toastEl.style.transform = 'translateX(-50%) translateY(0)';
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => {
+      toastEl.style.opacity = '0';
+      toastEl.style.transform = 'translateX(-50%) translateY(20px)';
+    }, ms);
+  }
+
+  function refreshControlLabels(){
+    gridSizeLabel.value = M;
+    distLabel.value = MIN_RED_DISTANCE;
+    gridMinusBtn.disabled = M <= GRID_MIN;
+    gridPlusBtn.disabled = M >= GRID_MAX;
+    distMinusBtn.disabled = MIN_RED_DISTANCE <= DIST_MIN;
+    distPlusBtn.disabled = MIN_RED_DISTANCE >= DIST_MAX;
+  }
+
+  // ---------- Canvas / sizing ----------
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+
+  let W, H, gridSize, offsetX, offsetY;
+
+  function layout(){
+    W = window.innerWidth;
+    H = window.innerHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const bottomReserved = 110;
+    const usableH = H - bottomReserved;
+    gridSize = Math.min(W, usableH) * 0.94;
+    offsetX = (W - gridSize) / 2;
+    const centerY = (H - gridSize) / 2;
+    const maxY = usableH - gridSize;
+    offsetY = Math.max(0, Math.min(centerY, maxY));
+
+    computePositions();
+  }
+
+  // ---------- Dot state ----------
+  // color: 'open' | 'blocked' | 'p1' | 'p2'
+  let dots = [];
+
+  function computePositions(){
+    for (const d of dots){
+      d.x = offsetX + (gridSize / N) * d.i;
+      d.y = offsetY + (gridSize / N) * d.j;
+    }
+  }
+
+  function initDots(){
+    dots = [];
+    for (let i = 0; i <= N; i++){
+      for (let j = 0; j <= N; j++){
+        dots.push({ i, j, x: 0, y: 0, color: 'open' });
+      }
+    }
+    computePositions();
+  }
+
+  function isPole(color){ return color === 'p1' || color === 'p2'; }
+
+  function hasPoleWithin(dot, maxDist){
+    for (const other of dots){
+      if (other === dot) continue;
+      if (isPole(other.color)){
+        const dist = Math.abs(dot.i - other.i) + Math.abs(dot.j - other.j);
+        if (dist <= maxDist) return true;
+      }
+    }
+    return false;
+  }
+
+  function refreshColors(){
+    for (const d of dots){
+      if (isPole(d.color)) continue;
+      d.color = hasPoleWithin(d, MIN_RED_DISTANCE) ? 'blocked' : 'open';
+    }
+  }
+
+  function updateCounter(){
+    const count = dots.filter(d => d.color === 'p1').length;
+    document.getElementById('counter').textContent = count;
+    saveBtn.disabled = count === 0;
+  }
+
+  // ---------- Drawing ----------
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = getCss('--grid-line');
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= N; i++){
+      const x = offsetX + (gridSize / N) * i;
+      const y = offsetY + (gridSize / N) * i;
+      ctx.beginPath();
+      ctx.moveTo(x, offsetY);
+      ctx.lineTo(x, offsetY + gridSize);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(offsetX, y);
+      ctx.lineTo(offsetX + gridSize, y);
+      ctx.stroke();
+    }
+
+    for (const d of dots){
+      if (d.color === 'p1' || d.color === 'p2'){
+        const mainVar = d.color === 'p1' ? '--pole-red' : '--pole-blue';
+        const glow = d.color === 'p1' ? 'rgba(255,77,94,0.65)' : 'rgba(77,141,255,0.65)';
+        ctx.save();
+        ctx.shadowColor = glow;
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = getCss(mainVar);
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, DOT_RADIUS + 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (d.color === 'blocked'){
+        ctx.fillStyle = getCss('--dot-blocked');
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, DOT_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = getCss('--dot-blocked-ring');
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = getCss('--dot-open');
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, DOT_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  let cssCache = {};
+  function getCss(varName){
+    if (!cssCache[varName]){
+      cssCache[varName] = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    }
+    return cssCache[varName];
+  }
+
+  // ---------- Pointer handling ----------
+  function getPointerPos(evt){
+    const rect = canvas.getBoundingClientRect();
+    if (evt.touches && evt.touches.length){
+      return { x: evt.touches[0].clientX - rect.left, y: evt.touches[0].clientY - rect.top };
+    }
+    return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+  }
+
+  function findDotAt(clientX, clientY){
+    for (const d of dots){
+      const dx = d.x - clientX;
+      const dy = d.y - clientY;
+      if (Math.hypot(dx, dy) <= CLICK_RADIUS) return d;
+    }
+    return null;
+  }
+
+  function handleClickSingle(clientX, clientY){
+    const d = findDotAt(clientX, clientY);
+    if (!d) return;
+    if (d.color === 'open'){
+      if (!hasPoleWithin(d, MIN_RED_DISTANCE)) d.color = 'p1';
+    } else if (d.color === 'p1'){
+      d.color = 'open';
+    }
+    refreshColors();
+    updateCounter();
+    draw();
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const p = getPointerPos(e);
+    if (appMode === 'single') handleClickSingle(p.x, p.y);
+    else handleClickMulti(p.x, p.y);
+  });
+
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const p = getPointerPos(e);
+    if (appMode === 'single') handleClickSingle(p.x, p.y);
+    else handleClickMulti(p.x, p.y);
+  }, { passive: false });
+
+  window.addEventListener('resize', () => { layout(); draw(); });
+
+  // ---------- Generic confirm modal ----------
+  const confirmModal = document.getElementById('confirmModal');
+  const confirmTitle = document.getElementById('confirmTitle');
+  const confirmMessage = document.getElementById('confirmMessage');
+  const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+  const confirmOkBtn = document.getElementById('confirmOkBtn');
+  let pendingConfirmAction = null;
+  let pendingCancelAction = null;
+
+  function askConfirm(title, message, onConfirm, onCancel){
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    pendingConfirmAction = onConfirm;
+    pendingCancelAction = onCancel || null;
+    confirmModal.classList.add('open');
+  }
+  function closeConfirm(){
+    confirmModal.classList.remove('open');
+    pendingConfirmAction = null;
+    const cancelFn = pendingCancelAction;
+    pendingCancelAction = null;
+    if (cancelFn) cancelFn();
+  }
+  confirmCancelBtn.addEventListener('click', closeConfirm);
+  confirmModal.addEventListener('click', (e) => { if (e.target === confirmModal) closeConfirm(); });
+  confirmOkBtn.addEventListener('click', () => {
+    const action = pendingConfirmAction;
+    pendingCancelAction = null;
+    confirmModal.classList.remove('open');
+    pendingConfirmAction = null;
+    if (action) action();
+  });
+
+  function hasPlacedPoles(){
+    return dots.some(d => isPole(d.color));
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    askConfirm(
+      'รีเซ็ตกระดาน?',
+      'จุดแม่เหล็กที่วางไว้ทั้งหมดจะถูกล้าง หากยังไม่ได้บันทึกคะแนนไว้ ข้อมูลจะหายไป',
+      () => { initDots(); updateCounter(); draw(); }
+    );
+  });
+
+  gridMinusBtn.addEventListener('click', () => changeGridSize(-1));
+  gridPlusBtn.addEventListener('click', () => changeGridSize(1));
+  distMinusBtn.addEventListener('click', () => changeDistance(-1));
+  distPlusBtn.addEventListener('click', () => changeDistance(1));
+  gridSizeLabel.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); gridSizeLabel.blur(); } });
+  gridSizeLabel.addEventListener('blur', () => requestGridSize(gridSizeLabel.value));
+  distLabel.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); distLabel.blur(); } });
+  distLabel.addEventListener('blur', () => requestDistance(distLabel.value));
+
+  function applyGridSize(next){
+    M = next; N = M - 1;
+    refreshControlLabels();
+    layout(); initDots(); updateCounter(); draw();
+  }
+  function changeGridSize(delta){
+    const next = M + delta;
+    if (next < GRID_MIN || next > GRID_MAX) return;
+    if (hasPlacedPoles()){
+      askConfirm('เปลี่ยนขนาด grid?', 'การเปลี่ยนขนาด grid จะล้างแม่เหล็กที่วางไว้ทั้งหมดบนกระดาน หากยังไม่ได้บันทึกคะแนนไว้ ข้อมูลจะหายไป', () => applyGridSize(next));
+    } else applyGridSize(next);
+  }
+  function requestGridSize(rawValue){
+    let next = parseInt(rawValue, 10);
+    if (isNaN(next)){ gridSizeLabel.value = M; return; }
+    next = Math.min(GRID_MAX, Math.max(GRID_MIN, next));
+    if (next === M){ gridSizeLabel.value = M; return; }
+    if (hasPlacedPoles()){
+      askConfirm('เปลี่ยนขนาด grid?', 'การเปลี่ยนขนาด grid จะล้างแม่เหล็กที่วางไว้ทั้งหมดบนกระดาน หากยังไม่ได้บันทึกคะแนนไว้ ข้อมูลจะหายไป', () => applyGridSize(next), () => { gridSizeLabel.value = M; });
+    } else applyGridSize(next);
+  }
+  function applyDistance(next){
+    MIN_RED_DISTANCE = next;
+    refreshControlLabels();
+    refreshColors(); updateCounter(); draw();
+  }
+  function changeDistance(delta){
+    const next = MIN_RED_DISTANCE + delta;
+    if (next < DIST_MIN || next > DIST_MAX) return;
+    if (hasPlacedPoles()){
+      askConfirm('เปลี่ยน magnet distance?', 'การเปลี่ยนระยะอาจทำให้บางจุดที่เคยเลือกได้ถูกล็อกใหม่ (จุดที่วางไว้จะไม่หาย)', () => applyDistance(next));
+    } else applyDistance(next);
+  }
+  function requestDistance(rawValue){
+    let next = parseInt(rawValue, 10);
+    if (isNaN(next)){ distLabel.value = MIN_RED_DISTANCE; return; }
+    next = Math.min(DIST_MAX, Math.max(DIST_MIN, next));
+    if (next === MIN_RED_DISTANCE){ distLabel.value = MIN_RED_DISTANCE; return; }
+    if (hasPlacedPoles()){
+      askConfirm('เปลี่ยน magnet distance?', 'การเปลี่ยนระยะอาจทำให้บางจุดที่เคยเลือกได้ถูกล็อกใหม่ (จุดที่วางไว้จะไม่หาย)', () => applyDistance(next), () => { distLabel.value = MIN_RED_DISTANCE; });
+    } else applyDistance(next);
+  }
+
+  // ---------- Save record modal (single player) ----------
+  const saveModal = document.getElementById('saveModal');
+  const modalNameInput = document.getElementById('modalNameInput');
+  const modalConfirm = document.getElementById('modalConfirm');
+  const modalCancel = document.getElementById('modalCancel');
+  const modalStatus = document.getElementById('modalStatus');
+  const modalScorePreview = document.getElementById('modalScorePreview');
+  const modalGridPreview = document.getElementById('modalGridPreview');
+  const modalDistPreview = document.getElementById('modalDistPreview');
+
+  saveBtn.addEventListener('click', () => {
+    const count = dots.filter(d => d.color === 'p1').length;
+    if (count === 0) return;
+    modalScorePreview.textContent = count;
+    modalGridPreview.textContent = M;
+    modalDistPreview.textContent = MIN_RED_DISTANCE;
+    modalStatus.textContent = firebaseReady ? '' : 'ยังไม่ได้ตั้งค่า Firebase — ดูคอมเมนต์ในโค้ดส่วนบนของสคริปต์';
+    modalNameInput.value = '';
+    saveModal.classList.add('open');
+    modalNameInput.focus();
+  });
+  modalCancel.addEventListener('click', () => saveModal.classList.remove('open'));
+  saveModal.addEventListener('click', (e) => { if (e.target === saveModal) saveModal.classList.remove('open'); });
+  modalConfirm.addEventListener('click', async () => {
+    const name = modalNameInput.value.trim();
+    if (!name){ modalStatus.textContent = 'กรุณาใส่ชื่อผู้เล่น'; return; }
+    const count = dots.filter(d => d.color === 'p1').length;
+    modalConfirm.disabled = true;
+    modalStatus.textContent = 'กำลังบันทึก…';
+    try {
+      await saveRecordToFirebase(name, count, M, MIN_RED_DISTANCE);
+      modalStatus.textContent = 'บันทึกสำเร็จ!';
+      setTimeout(() => { saveModal.classList.remove('open'); }, 700);
+      refreshLeaderboard();
+    } catch (err) {
+      modalStatus.textContent = 'บันทึกไม่สำเร็จ: ' + err.message;
+    } finally {
+      modalConfirm.disabled = false;
+    }
+  });
+
+  // ---------- Leaderboard panel (single player) ----------
+  const leaderboardBtn = document.getElementById('leaderboardBtn');
+  const leaderboardPanel = document.getElementById('leaderboardPanel');
+  const leaderboardList = document.getElementById('leaderboardList');
+  const leaderboardRefresh = document.getElementById('leaderboardRefresh');
+
+  leaderboardBtn.addEventListener('click', () => {
+    leaderboardPanel.classList.toggle('open');
+    if (leaderboardPanel.classList.contains('open')) refreshLeaderboard();
+  });
+  leaderboardRefresh.addEventListener('click', (e) => { e.stopPropagation(); refreshLeaderboard(); });
+
+  async function refreshLeaderboard(){
+    leaderboardList.innerHTML = '<li class="loading">กำลังโหลด…</li>';
+    if (!firebaseReady){
+      leaderboardList.innerHTML = '<li class="empty">ยังไม่ได้ตั้งค่า Firebase config</li>';
+      return;
+    }
+    try {
+      const records = await loadTopRecords(10);
+      if (!records.length){
+        leaderboardList.innerHTML = '<li class="empty">ยังไม่มีบันทึกคะแนน</li>';
+        return;
+      }
+      leaderboardList.innerHTML = records.map((r, idx) => `
+        <li>
+          <div class="row-main">
+            <span class="rk">#${idx + 1}</span>
+            <span class="nm">${escapeHtml(r.name || '—')}</span>
+            <span class="sc">${r.score}</span>
+          </div>
+          <div class="meta">grid ${r.gridSize ?? '—'} · distance ${r.distance ?? '—'}</div>
+        </li>
+      `).join('');
+    } catch (err) {
+      leaderboardList.innerHTML = `<li class="empty">โหลดไม่สำเร็จ: ${escapeHtml(err.message)}</li>`;
+    }
+  }
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ======================================================================
+  // ---------- MULTIPLAYER (2 players, room code, turn-based) ----------
+  // ======================================================================
+
+  const modeModal = document.getElementById('modeModal');
+  const chooseSingleBtn = document.getElementById('chooseSingleBtn');
+  const chooseMultiBtn = document.getElementById('chooseMultiBtn');
+  const multiplayerToggleBtn = document.getElementById('multiplayerToggleBtn');
+
+  const mpModal = document.getElementById('mpModal');
+  const tabCreateBtn = document.getElementById('tabCreateBtn');
+  const tabJoinBtn = document.getElementById('tabJoinBtn');
+  const tabCreatePanel = document.getElementById('tabCreatePanel');
+  const tabJoinPanel = document.getElementById('tabJoinPanel');
+  const createNameInput = document.getElementById('createNameInput');
+  const joinNameInput = document.getElementById('joinNameInput');
+  const joinCodeInput = document.getElementById('joinCodeInput');
+  const createStatus = document.getElementById('createStatus');
+  const joinStatus = document.getElementById('joinStatus');
+  const mpCreateConfirmBtn = document.getElementById('mpCreateConfirmBtn');
+  const mpJoinConfirmBtn = document.getElementById('mpJoinConfirmBtn');
+  const mpCreateCancelBtn = document.getElementById('mpCreateCancelBtn');
+  const mpJoinCancelBtn = document.getElementById('mpJoinCancelBtn');
+
+  const mpGridMinus = document.getElementById('mpGridMinus');
+  const mpGridPlus = document.getElementById('mpGridPlus');
+  const mpGridVal = document.getElementById('mpGridVal');
+  const mpDistMinus = document.getElementById('mpDistMinus');
+  const mpDistPlus = document.getElementById('mpDistPlus');
+  const mpDistVal = document.getElementById('mpDistVal');
+
+  const waitingModal = document.getElementById('waitingModal');
+  const waitingRoomCode = document.getElementById('waitingRoomCode');
+  const waitingCancelBtn = document.getElementById('waitingCancelBtn');
+  const copyCodeBtn = document.getElementById('copyCodeBtn');
+  const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+  const resultModal = document.getElementById('resultModal');
+  const resultTitle = document.getElementById('resultTitle');
+  const resultScores = document.getElementById('resultScores');
+  const resultCloseBtn = document.getElementById('resultCloseBtn');
+  const resultNewRoomBtn = document.getElementById('resultNewRoomBtn');
+
+  const mpHud = document.getElementById('mpHud');
+  const mpRoomCodeLabel = document.getElementById('mpRoomCodeLabel');
+  const mpRow1 = document.getElementById('mpRow1');
+  const mpRow2 = document.getElementById('mpRow2');
+  const mpName1 = document.getElementById('mpName1');
+  const mpName2 = document.getElementById('mpName2');
+  const mpScore1 = document.getElementById('mpScore1');
+  const mpScore2 = document.getElementById('mpScore2');
+  const mpTurnStatus = document.getElementById('mpTurnStatus');
+  const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
+  let mpGridSizeSel = 5;
+  let mpDistanceSel = 2;
+  let myPlayerNumber = 0;      // 1 or 2
+  let currentRoomCode = null;
+  let currentRoomData = null;
+  let unsubscribeRoom = null;
+  let finishedHandled = false;
+
+  const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function genRoomCode(len = 6){
+    let s = '';
+    for (let k = 0; k < len; k++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return s;
+  }
+  function cellKey(i, j){ return `${i}_${j}`; }
+
+  function setBodyMode(mode){
+    appMode = mode;
+    document.body.classList.toggle('mode-multi', mode === 'multi');
+    document.body.classList.toggle('mode-single', mode === 'single');
+    document.querySelectorAll('.single-only').forEach(el => { el.style.display = (mode === 'single') ? '' : 'none'; });
+    document.querySelectorAll('.multi-only').forEach(el => { el.style.display = (mode === 'multi') ? '' : 'none'; });
+    mpHud.classList.toggle('show', mode === 'multi');
+    footerNote.textContent = mode === 'single'
+      ? 'คลิกจุดสีเทาเพื่อวางขั้วแม่เหล็ก · จุดที่อยู่ใกล้กันเกินไปจะถูกล็อกเป็นสีดำ'
+      : 'ผลัดกันคลิกวางเสาแม่เหล็ก · ใครวางได้เยอะกว่าเมื่อกระดานเต็มคือผู้ชนะ';
+  }
+
+  // -- mode select modal --
+  chooseSingleBtn.addEventListener('click', () => {
+    setBodyMode('single');
+    modeModal.classList.remove('open');
+  });
+  chooseMultiBtn.addEventListener('click', () => {
+    modeModal.classList.remove('open');
+    openMpModal();
+  });
+  multiplayerToggleBtn.addEventListener('click', () => openMpModal());
+
+  function openMpModal(){
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomParam = (urlParams.get('room') || '').toUpperCase().trim();
+    if (roomParam){
+      joinCodeInput.value = roomParam;
+      switchTab('join');
+    }
+    createStatus.textContent = firebaseReady ? '' : 'ยังไม่ได้ตั้งค่า Firebase — ดูคอมเมนต์ในโค้ดส่วนบนของสคริปต์';
+    joinStatus.textContent = '';
+    mpModal.classList.add('open');
+  }
+  mpCreateCancelBtn.addEventListener('click', () => mpModal.classList.remove('open'));
+  mpJoinCancelBtn.addEventListener('click', () => mpModal.classList.remove('open'));
+  mpModal.addEventListener('click', (e) => { if (e.target === mpModal) mpModal.classList.remove('open'); });
+
+  function switchTab(which){
+    const create = which === 'create';
+    tabCreateBtn.classList.toggle('active', create);
+    tabJoinBtn.classList.toggle('active', !create);
+    tabCreatePanel.classList.toggle('active', create);
+    tabJoinPanel.classList.toggle('active', !create);
+  }
+  tabCreateBtn.addEventListener('click', () => switchTab('create'));
+  tabJoinBtn.addEventListener('click', () => switchTab('join'));
+
+  function refreshMpStepperLabels(){
+    mpGridVal.value = mpGridSizeSel;
+    mpDistVal.value = mpDistanceSel;
+    mpGridMinus.disabled = mpGridSizeSel <= GRID_MIN;
+    mpGridPlus.disabled = mpGridSizeSel >= GRID_MAX;
+    mpDistMinus.disabled = mpDistanceSel <= DIST_MIN;
+    mpDistPlus.disabled = mpDistanceSel >= DIST_MAX;
+  }
+  mpGridMinus.addEventListener('click', () => { if (mpGridSizeSel > GRID_MIN) mpGridSizeSel--; refreshMpStepperLabels(); });
+  mpGridPlus.addEventListener('click', () => { if (mpGridSizeSel < GRID_MAX) mpGridSizeSel++; refreshMpStepperLabels(); });
+  mpDistMinus.addEventListener('click', () => { if (mpDistanceSel > DIST_MIN) mpDistanceSel--; refreshMpStepperLabels(); });
+  mpDistPlus.addEventListener('click', () => { if (mpDistanceSel < DIST_MAX) mpDistanceSel++; refreshMpStepperLabels(); });
+  mpGridVal.addEventListener('blur', () => {
+    let v = parseInt(mpGridVal.value, 10);
+    if (isNaN(v)) v = mpGridSizeSel;
+    mpGridSizeSel = Math.min(GRID_MAX, Math.max(GRID_MIN, v));
+    refreshMpStepperLabels();
+  });
+  mpDistVal.addEventListener('blur', () => {
+    let v = parseInt(mpDistVal.value, 10);
+    if (isNaN(v)) v = mpDistanceSel;
+    mpDistanceSel = Math.min(DIST_MAX, Math.max(DIST_MIN, v));
+    refreshMpStepperLabels();
+  });
+  refreshMpStepperLabels();
+
+  // -- create room --
+  mpCreateConfirmBtn.addEventListener('click', async () => {
+    const name = createNameInput.value.trim();
+    if (!name){ createStatus.textContent = 'กรุณาใส่ชื่อของคุณ'; return; }
+    if (!firebaseReady){ createStatus.textContent = 'ยังไม่ได้ตั้งค่า Firebase config'; return; }
+    mpCreateConfirmBtn.disabled = true;
+    createStatus.textContent = 'กำลังสร้างห้อง…';
+    try {
+      let code, ref, snap;
+      do {
+        code = genRoomCode();
+        ref = doc(db, ROOMS_COLLECTION, code);
+        snap = await getDoc(ref);
+      } while (snap.exists());
+
+      const roomData = {
+        code,
+        gridSize: mpGridSizeSel,
+        distance: mpDistanceSel,
+        dots: {},
+        turn: 1,
+        player1: { name: name.slice(0, 16) },
+        player2: null,
+        status: 'waiting',
+        winner: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      await setDoc(ref, roomData);
+
+      myPlayerNumber = 1;
+      currentRoomCode = code;
+      mpModal.classList.remove('open');
+      waitingRoomCode.textContent = code;
+      waitingModal.classList.add('open');
+      subscribeRoom(code);
+    } catch (err) {
+      createStatus.textContent = 'สร้างห้องไม่สำเร็จ: ' + err.message;
+    } finally {
+      mpCreateConfirmBtn.disabled = false;
+    }
+  });
+
+  // -- join room --
+  mpJoinConfirmBtn.addEventListener('click', async () => {
+    const name = joinNameInput.value.trim();
+    const code = joinCodeInput.value.trim().toUpperCase();
+    if (!name){ joinStatus.textContent = 'กรุณาใส่ชื่อของคุณ'; return; }
+    if (!code){ joinStatus.textContent = 'กรุณาใส่รหัสห้อง'; return; }
+    if (!firebaseReady){ joinStatus.textContent = 'ยังไม่ได้ตั้งค่า Firebase config'; return; }
+    mpJoinConfirmBtn.disabled = true;
+    joinStatus.textContent = 'กำลังเข้าร่วม…';
+    try {
+      const ref = doc(db, ROOMS_COLLECTION, code);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('ไม่พบห้องนี้ ตรวจสอบรหัสอีกครั้ง');
+        const data = snap.data();
+        if (data.status !== 'waiting' || data.player2) throw new Error('ห้องนี้เริ่มเล่นไปแล้วหรือเต็มแล้ว');
+        tx.update(ref, {
+          player2: { name: name.slice(0, 16) },
+          status: 'playing',
+          updatedAt: serverTimestamp()
+        });
+      });
+      myPlayerNumber = 2;
+      currentRoomCode = code;
+      mpModal.classList.remove('open');
+      subscribeRoom(code);
+    } catch (err) {
+      joinStatus.textContent = 'เข้าร่วมไม่สำเร็จ: ' + err.message;
+    } finally {
+      mpJoinConfirmBtn.disabled = false;
+    }
+  });
+
+  // -- waiting modal share buttons --
+  copyCodeBtn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(currentRoomCode || ''); showToast('คัดลอกรหัสห้องแล้ว'); }
+    catch { showToast('คัดลอกไม่สำเร็จ ลองคัดลอกเอง: ' + currentRoomCode); }
+  });
+  copyLinkBtn.addEventListener('click', async () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('room', currentRoomCode || '');
+    try { await navigator.clipboard.writeText(url.toString()); showToast('คัดลอกลิงก์เชิญแล้ว'); }
+    catch { showToast('คัดลอกไม่สำเร็จ ลองคัดลอกเอง: ' + url.toString()); }
+  });
+  waitingCancelBtn.addEventListener('click', () => {
+    waitingModal.classList.remove('open');
+    teardownRoomSubscription();
+    setBodyMode('single');
+    // Note: room document is left in Firestore unattended; harmless for gameplay purposes.
+  });
+
+  // -- subscribe / render room --
+  function subscribeRoom(code){
+    teardownRoomSubscription();
+    finishedHandled = false;
+    const ref = doc(db, ROOMS_COLLECTION, code);
+    unsubscribeRoom = onSnapshot(ref, (snap) => {
+      if (!snap.exists()){
+        showToast('ห้องนี้ถูกลบหรือไม่มีอยู่แล้ว');
+        teardownRoomSubscription();
+        setBodyMode('single');
+        return;
+      }
+      currentRoomData = snap.data();
+      onRoomUpdate();
+    }, (err) => {
+      showToast('การเชื่อมต่อห้องขาดหาย: ' + err.message);
+    });
+  }
+  function teardownRoomSubscription(){
+    if (unsubscribeRoom){ unsubscribeRoom(); unsubscribeRoom = null; }
+    currentRoomData = null;
+  }
+
+  function buildDotsFromRoom(room){
+    const gM = room.gridSize;
+    const gN = gM - 1;
+    if (gM !== M){
+      M = gM; N = gN;
+      layout();
+    }
+    const list = [];
+    for (let i = 0; i <= N; i++){
+      for (let j = 0; j <= N; j++){
+        const owner = room.dots ? room.dots[cellKey(i, j)] : null;
+        list.push({ i, j, x: 0, y: 0, color: owner === 1 ? 'p1' : owner === 2 ? 'p2' : 'open' });
+      }
+    }
+    dots = list;
+    MIN_RED_DISTANCE = room.distance;
+    computePositions();
+    refreshColors();
+  }
+
+  function onRoomUpdate(){
+    const room = currentRoomData;
+    if (!room) return;
+
+    if (room.status === 'waiting'){
+      // still waiting for player2, nothing else to do — waitingModal already open for creator
+      waitingRoomCode.textContent = room.code;
+      return;
+    }
+
+    // status is 'playing' or 'finished'
+    if (waitingModal.classList.contains('open')) waitingModal.classList.remove('open');
+    if (mpModal.classList.contains('open')) mpModal.classList.remove('open');
+    setBodyMode('multi');
+
+    buildDotsFromRoom(room);
+    draw();
+
+    mpRoomCodeLabel.textContent = room.code;
+    mpName1.textContent = room.player1?.name || 'ผู้เล่น 1';
+    mpName2.textContent = room.player2?.name || 'ผู้เล่น 2';
+    const score1 = dots.filter(d => d.color === 'p1').length;
+    const score2 = dots.filter(d => d.color === 'p2').length;
+    mpScore1.textContent = score1;
+    mpScore2.textContent = score2;
+    mpRow1.classList.toggle('active-turn', room.status === 'playing' && room.turn === 1);
+    mpRow2.classList.toggle('active-turn', room.status === 'playing' && room.turn === 2);
+
+    if (room.status === 'playing'){
+      const isMyTurn = room.turn === myPlayerNumber;
+      mpTurnStatus.textContent = isMyTurn ? '👉 ถึงตาคุณแล้ว วางเสาแม่เหล็กได้เลย' : `รอ ${room.turn === 1 ? (room.player1?.name || 'ผู้เล่น 1') : (room.player2?.name || 'ผู้เล่น 2')} เดิน…`;
+    } else if (room.status === 'finished'){
+      mpTurnStatus.textContent = 'เกมจบแล้ว';
+      if (!finishedHandled){
+        finishedHandled = true;
+        showResult(room, score1, score2);
+      }
+    }
+  }
+
+  function showResult(room, score1, score2){
+    let title = 'เกมจบแล้ว — เสมอกัน!';
+    resultScores.innerHTML = '';
+    const rows = [
+      { name: room.player1?.name || 'ผู้เล่น 1', score: score1, cls: 'p1', win: room.winner === 1 },
+      { name: room.player2?.name || 'ผู้เล่น 2', score: score2, cls: 'p2', win: room.winner === 2 }
+    ];
+    if (room.winner === 1) title = `🏆 ${rows[0].name} ชนะ!`;
+    else if (room.winner === 2) title = `🏆 ${rows[1].name} ชนะ!`;
+    resultTitle.textContent = title;
+    rows.forEach(r => {
+      const div = document.createElement('div');
+      div.className = 'result-score-row' + (r.win ? ' winner' : '');
+      div.innerHTML = `<span class="mp-dot ${r.cls}"></span><span class="name">${escapeHtml(r.name)}</span><span class="score">${r.score}</span>`;
+      resultScores.appendChild(div);
+    });
+    resultModal.classList.add('open');
+  }
+  resultCloseBtn.addEventListener('click', () => resultModal.classList.remove('open'));
+  resultNewRoomBtn.addEventListener('click', () => {
+    resultModal.classList.remove('open');
+    teardownRoomSubscription();
+    setBodyMode('single');
+    openMpModal();
+    switchTab('create');
+  });
+
+  // -- placing a pole (turn-based, validated in a transaction) --
+  function computeIsOpen(dotsMap, i, j, distance, gN){
+    if (dotsMap[cellKey(i, j)]) return false;
+    for (const key in dotsMap){
+      const [oi, oj] = key.split('_').map(Number);
+      const dist = Math.abs(i - oi) + Math.abs(j - oj);
+      if (dist <= distance) return false;
+    }
+    return true;
+  }
+  function computeBoardFull(dotsMap, gM, distance){
+    const gN = gM - 1;
+    for (let i = 0; i <= gN; i++){
+      for (let j = 0; j <= gN; j++){
+        if (computeIsOpen(dotsMap, i, j, distance, gN)) return false;
+      }
+    }
+    return true;
+  }
+
+  async function handleClickMulti(clientX, clientY){
+    if (!currentRoomData || currentRoomData.status !== 'playing') return;
+    if (currentRoomData.turn !== myPlayerNumber){ showToast('ยังไม่ถึงตาคุณ'); return; }
+    const d = findDotAt(clientX, clientY);
+    if (!d) return;
+    if (d.color !== 'open') return;
+
+    const ref = doc(db, ROOMS_COLLECTION, currentRoomCode);
+    const myTurn = myPlayerNumber;
+    const i = d.i, j = d.j;
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('ห้องนี้ถูกลบไปแล้ว');
+        const room = snap.data();
+        if (room.status !== 'playing') throw new Error('เกมนี้จบไปแล้ว');
+        if (room.turn !== myTurn) throw new Error('ยังไม่ถึงตาคุณ');
+        const dotsMap = room.dots || {};
+        if (!computeIsOpen(dotsMap, i, j, room.distance)) throw new Error('จุดนี้ถูกใช้ไปแล้ว');
+
+        const newDots = { ...dotsMap, [cellKey(i, j)]: myTurn };
+        const full = computeBoardFull(newDots, room.gridSize, room.distance);
+        const nextTurn = myTurn === 1 ? 2 : 1;
+
+        const update = {
+          dots: newDots,
+          updatedAt: serverTimestamp()
+        };
+        if (full){
+          const s1 = Object.values(newDots).filter(v => v === 1).length;
+          const s2 = Object.values(newDots).filter(v => v === 2).length;
+          update.status = 'finished';
+          update.winner = s1 > s2 ? 1 : (s2 > s1 ? 2 : 0);
+          update.turn = room.turn;
+        } else {
+          update.turn = nextTurn;
+        }
+        tx.update(ref, update);
+      });
+    } catch (err) {
+      showToast(err.message || 'เกิดข้อผิดพลาด');
+    }
+  }
+
+  // -- leave room --
+  leaveRoomBtn.addEventListener('click', () => {
+    askConfirm(
+      'ออกจากห้อง?',
+      'คุณจะกลับไปหน้าเลือกโหมด ห้องนี้ยังคงอยู่แต่คุณจะไม่ได้รับข้อมูลอัปเดตอีก',
+      () => {
+        teardownRoomSubscription();
+        currentRoomCode = null;
+        myPlayerNumber = 0;
+        const url = new URL(window.location.href);
+        url.searchParams.delete('room');
+        window.history.replaceState({}, '', url.toString());
+        setBodyMode('single');
+        applyGridSize(M);
+      }
+    );
+  });
+
+  // ---------- Init ----------
+  refreshControlLabels();
+  layout();
+  initDots();
+  updateCounter();
+  draw();
+  setBodyMode('single');
+
+  // auto-open join tab if a ?room= link was used to land on the page
+  const initialParams = new URLSearchParams(window.location.search);
+  if (initialParams.get('room')){
+    modeModal.classList.remove('open');
+    openMpModal();
+  }
+  })();
+</script>
+</body>
+</html>
