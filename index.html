@@ -422,6 +422,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    flex-wrap: wrap;
   }
 
   .modal-actions button{
@@ -560,15 +561,18 @@
   .result-score-row .name{ flex: 1; }
   .result-score-row .score{ font-weight: 700; font-size: 18px; }
 
+  /* Footer note: positioned above the "เล่น 2 คนออนไลน์" button so the two
+     no longer sit on top of each other (both previously shared the exact
+     same bottom/left coordinates). */
   .footer-note{
     position: absolute;
-    text-align: center;
-    bottom: clamp(20px, 4vw, 34px);
+    bottom: clamp(72px, 10vw, 92px);
     left: clamp(14px, 3vw, 30px);
     font-size: clamp(11px, 1.3vw, 13px);
     color: var(--text-dim);
     pointer-events: none;
     max-width: 44vw;
+    text-align: left;
   }
 </style>
 </head>
@@ -741,6 +745,7 @@
       <div class="result-scores" id="resultScores"></div>
       <div class="modal-actions">
         <button id="resultCloseBtn" class="btn-ghost" type="button">ปิด</button>
+        <button id="resultRematchBtn" class="btn-primary" type="button">🔁 เล่นใหม่อีกครั้ง</button>
         <button id="resultNewRoomBtn" class="btn-primary-blue" type="button">สร้างห้องใหม่</button>
       </div>
     </div>
@@ -1248,6 +1253,7 @@
   const resultTitle = document.getElementById('resultTitle');
   const resultScores = document.getElementById('resultScores');
   const resultCloseBtn = document.getElementById('resultCloseBtn');
+  const resultRematchBtn = document.getElementById('resultRematchBtn');
   const resultNewRoomBtn = document.getElementById('resultNewRoomBtn');
 
   const mpHud = document.getElementById('mpHud');
@@ -1503,6 +1509,13 @@
     if (mpModal.classList.contains('open')) mpModal.classList.remove('open');
     setBodyMode('multi');
 
+    // Once the game is back to 'playing' (e.g. after a rematch), any old
+    // result modal / finished state should be cleared out.
+    if (room.status === 'playing'){
+      finishedHandled = false;
+      if (resultModal.classList.contains('open')) resultModal.classList.remove('open');
+    }
+
     buildDotsFromRoom(room);
     draw();
 
@@ -1544,9 +1557,38 @@
       div.innerHTML = `<span class="mp-dot ${r.cls}"></span><span class="name">${escapeHtml(r.name)}</span><span class="score">${r.score}</span>`;
       resultScores.appendChild(div);
     });
+    resultRematchBtn.disabled = false;
+    resultRematchBtn.textContent = '🔁 เล่นใหม่อีกครั้ง';
     resultModal.classList.add('open');
   }
   resultCloseBtn.addEventListener('click', () => resultModal.classList.remove('open'));
+
+  // -- rematch: reset the SAME room so both players can play again instantly --
+  resultRematchBtn.addEventListener('click', async () => {
+    if (!currentRoomCode || !db) return;
+    resultRematchBtn.disabled = true;
+    resultRematchBtn.textContent = 'กำลังเริ่มใหม่…';
+    try {
+      const ref = doc(db, ROOMS_COLLECTION, currentRoomCode);
+      await updateDoc(ref, {
+        dots: {},
+        turn: 1,
+        status: 'playing',
+        winner: null,
+        updatedAt: serverTimestamp()
+      });
+      // The onSnapshot listener will pick up the change and close this modal
+      // automatically (see onRoomUpdate), but close it right away too for
+      // a snappier feel while we wait for the round trip.
+      resultModal.classList.remove('open');
+    } catch (err) {
+      showToast('เริ่มเกมใหม่ไม่สำเร็จ: ' + err.message);
+    } finally {
+      resultRematchBtn.disabled = false;
+      resultRematchBtn.textContent = '🔁 เล่นใหม่อีกครั้ง';
+    }
+  });
+
   resultNewRoomBtn.addEventListener('click', () => {
     resultModal.classList.remove('open');
     teardownRoomSubscription();
@@ -1582,9 +1624,22 @@
     if (!d) return;
     if (d.color !== 'open') return;
 
-    const ref = doc(db, ROOMS_COLLECTION, currentRoomCode);
     const myTurn = myPlayerNumber;
     const i = d.i, j = d.j;
+
+    // ---- Optimistic UI: paint the move locally right away instead of
+    // waiting for the round trip to Firestore and back through onSnapshot.
+    // If the write ends up failing (e.g. someone else grabbed the same
+    // spot a moment earlier), we roll back to the last confirmed room
+    // state below.
+    const prevColor = d.color;
+    d.color = myTurn === 1 ? 'p1' : 'p2';
+    refreshColors();
+    updateCounter();
+    draw();
+    mpTurnStatus.textContent = 'กำลังส่งการเดิน…';
+
+    const ref = doc(db, ROOMS_COLLECTION, currentRoomCode);
     try {
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);
@@ -1614,7 +1669,15 @@
         }
         tx.update(ref, update);
       });
+      // Success: the onSnapshot listener will re-sync `dots` from the
+      // server anyway, keeping everything consistent.
     } catch (err) {
+      // Roll back the optimistic move and re-render from the last known
+      // good room state.
+      if (currentRoomData) buildDotsFromRoom(currentRoomData);
+      else d.color = prevColor;
+      updateCounter();
+      draw();
       showToast(err.message || 'เกิดข้อผิดพลาด');
     }
   }
