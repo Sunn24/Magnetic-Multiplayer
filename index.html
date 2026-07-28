@@ -1292,7 +1292,7 @@
     mpHud.classList.toggle('show', mode === 'multi');
     footerNote.textContent = mode === 'single'
       ? 'คลิกจุดสีเทาเพื่อวางขั้วแม่เหล็ก · จุดที่อยู่ใกล้กันเกินไปจะถูกล็อกเป็นสีดำ'
-      : 'ผลัดกันคลิกวางเสาแม่เหล็ก · ใครวางได้เยอะกว่าเมื่อกระดานเต็มคือผู้ชนะ';
+      : 'ผลัดกันคลิกวางเสาแม่เหล็ก · ใครวางได้เป็นคนสุดท้ายเมื่อกระดานเต็มคือผู้ชนะ';
   }
 
   // -- mode select modal --
@@ -1659,10 +1659,8 @@
           updatedAt: serverTimestamp()
         };
         if (full){
-          const s1 = Object.values(newDots).filter(v => v === 1).length;
-          const s2 = Object.values(newDots).filter(v => v === 2).length;
           update.status = 'finished';
-          update.winner = s1 > s2 ? 1 : (s2 > s1 ? 2 : 0);
+          update.winner = myTurn; // last player able to place a magnet wins
           update.turn = room.turn;
         } else {
           update.turn = nextTurn;
@@ -1696,6 +1694,7 @@
         window.history.replaceState({}, '', url.toString());
         setBodyMode('single');
         applyGridSize(M);
+        modeModal.classList.add('open');
       }
     );
   });
