@@ -1586,21 +1586,28 @@
   }
 
   function showResult(room, score1, score2){
+    const name1 = room.player1?.name || 'ผู้เล่น 1';
+    const name2 = room.player2?.name || 'ผู้เล่น 2';
+
     let title = 'เกมจบแล้ว — เสมอกัน!';
     resultScores.innerHTML = '';
-    const rows = [
-      { name: room.player1?.name || 'ผู้เล่น 1', score: score1, cls: 'p1', win: room.winner === 1 },
-      { name: room.player2?.name || 'ผู้เล่น 2', score: score2, cls: 'p2', win: room.winner === 2 }
-    ];
-    if (room.winner === 1) title = `🏆 ${rows[0].name} ชนะ!`;
-    else if (room.winner === 2) title = `🏆 ${rows[1].name} ชนะ!`;
-    resultTitle.textContent = title;
-    rows.forEach(r => {
+
+    if (room.winner === 1 || room.winner === 2){
+      const winnerName = room.winner === 1 ? name1 : name2;
+      const winnerCls = room.winner === 1 ? 'p1' : 'p2';
+      title = `🏆 ${winnerName} ชนะ!`;
       const div = document.createElement('div');
-      div.className = 'result-score-row' + (r.win ? ' winner' : '');
-      div.innerHTML = `<span class="mp-dot ${r.cls}"></span><span class="name">${escapeHtml(r.name)}</span><span class="score">${r.score}</span>`;
+      div.className = 'result-score-row winner';
+      div.innerHTML = `<span class="mp-dot ${winnerCls}"></span><span class="name">${escapeHtml(winnerName)} ชนะเกมนี้</span>`;
       resultScores.appendChild(div);
-    });
+    } else {
+      const div = document.createElement('div');
+      div.className = 'result-score-row';
+      div.innerHTML = `<span class="name">ไม่มีผู้ชนะ — เสมอกัน</span>`;
+      resultScores.appendChild(div);
+    }
+
+    resultTitle.textContent = title;
     resultRematchBtn.disabled = false;
     resultRematchBtn.textContent = '🔁 เล่นใหม่อีกครั้ง';
     resultModal.classList.add('open');
