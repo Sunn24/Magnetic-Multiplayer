@@ -751,6 +751,17 @@
     </div>
   </div>
 
+  <!-- ============ Opponent left room modal ============ -->
+  <div class="modal-overlay" id="opponentLeftModal">
+    <div class="modal-box">
+      <h3>ผู้เล่นอีกฝ่ายออกจากห้องแล้ว</h3>
+      <p>อีกฝ่ายออกจากห้องนี้ไปแล้ว เกมนี้จึงสิ้นสุดลง กดปุ่มด้านล่างเพื่อกลับไปหน้าเลือกโหมด</p>
+      <div class="modal-actions">
+        <button id="opponentLeftOkBtn" class="btn-primary" type="button">กลับไปหน้าเลือกโหมด</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ============ Toast ============ -->
   <div id="toast" style="position:fixed;left:50%;bottom:100px;transform:translateX(-50%) translateY(20px);background:var(--bg-panel);border:1px solid var(--grid-line);color:var(--text-main);padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity 0.2s ease, transform 0.2s ease;z-index:30;"></div>
 </div>
@@ -1267,6 +1278,9 @@
   const mpTurnStatus = document.getElementById('mpTurnStatus');
   const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 
+  const opponentLeftModal = document.getElementById('opponentLeftModal');
+  const opponentLeftOkBtn = document.getElementById('opponentLeftOkBtn');
+
   let mpGridSizeSel = 5;
   let mpDistanceSel = 2;
   let myPlayerNumber = 0;      // 1 or 2
@@ -1494,9 +1508,39 @@
     refreshColors();
   }
 
+  function returnToModeSelect(){
+    teardownRoomSubscription();
+    currentRoomCode = null;
+    myPlayerNumber = 0;
+    finishedHandled = false;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('room');
+    window.history.replaceState({}, '', url.toString());
+    if (waitingModal.classList.contains('open')) waitingModal.classList.remove('open');
+    if (resultModal.classList.contains('open')) resultModal.classList.remove('open');
+    if (opponentLeftModal.classList.contains('open')) opponentLeftModal.classList.remove('open');
+    setBodyMode('single');
+    applyGridSize(M);
+    modeModal.classList.add('open');
+  }
+  opponentLeftOkBtn.addEventListener('click', returnToModeSelect);
+
   function onRoomUpdate(){
     const room = currentRoomData;
     if (!room) return;
+
+    if (room.status === 'left'){
+      // The other player left the room. Only show the popup to the
+      // player who is still around (the leaver already tore down their
+      // own subscription locally before writing this status).
+      if (!finishedHandled){
+        finishedHandled = true;
+        if (waitingModal.classList.contains('open')) waitingModal.classList.remove('open');
+        if (mpModal.classList.contains('open')) mpModal.classList.remove('open');
+        opponentLeftModal.classList.add('open');
+      }
+      return;
+    }
 
     if (room.status === 'waiting'){
       // still waiting for player2, nothing else to do — waitingModal already open for creator
@@ -1684,8 +1728,11 @@
   leaveRoomBtn.addEventListener('click', () => {
     askConfirm(
       'ออกจากห้อง?',
-      'คุณจะกลับไปหน้าเลือกโหมด ห้องนี้ยังคงอยู่แต่คุณจะไม่ได้รับข้อมูลอัปเดตอีก',
+      'คุณจะกลับไปหน้าเลือกโหมด อีกฝ่ายจะเห็นการแจ้งเตือนว่าคุณออกจากห้องแล้ว',
       () => {
+        const codeBeingLeft = currentRoomCode;
+        // Tear down our own listener first so we don't process the
+        // 'left' status update we're about to write ourselves.
         teardownRoomSubscription();
         currentRoomCode = null;
         myPlayerNumber = 0;
@@ -1695,6 +1742,15 @@
         setBodyMode('single');
         applyGridSize(M);
         modeModal.classList.add('open');
+
+        // Notify the other player (if any) by marking the room as left.
+        if (db && codeBeingLeft){
+          const ref = doc(db, ROOMS_COLLECTION, codeBeingLeft);
+          updateDoc(ref, {
+            status: 'left',
+            updatedAt: serverTimestamp()
+          }).catch(() => { /* room may already be gone — safe to ignore */ });
+        }
       }
     );
   });
