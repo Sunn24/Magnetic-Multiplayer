@@ -585,7 +585,7 @@
       <span class="label">Grid size</span>
       <div class="stepper">
         <button id="gridMinus" type="button" aria-label="ลดขนาดกริด">−</button>
-        <input class="value" id="gridSizeVal" type="number" inputmode="numeric" value="5" min="2" max="24" aria-label="ขนาดกริด">
+        <input class="value" id="gridSizeVal" type="number" inputmode="numeric" value="5" min="4" max="24" aria-label="ขนาดกริด">
         <button id="gridPlus" type="button" aria-label="เพิ่มขนาดกริด">+</button>
       </div>
     </div>
@@ -690,7 +690,7 @@
           <span class="label">Grid size</span>
           <div class="stepper">
             <button id="mpGridMinus" type="button">−</button>
-            <input class="value" id="mpGridVal" type="number" inputmode="numeric" value="5" min="2" max="24">
+            <input class="value" id="mpGridVal" type="number" inputmode="numeric" value="5" min="4" max="24">
             <button id="mpGridPlus" type="button">+</button>
           </div>
         </div>
@@ -822,7 +822,7 @@
   "use strict";
 
   // ---------- Config ----------
-  const GRID_MIN = 2, GRID_MAX = 24;
+  const GRID_MIN = 4, GRID_MAX = 24;
   const DIST_MIN = 1, DIST_MAX = 8;
 
   let M = 5;
@@ -1430,9 +1430,11 @@
         if (!snap.exists()) throw new Error('ไม่พบห้องนี้ ตรวจสอบรหัสอีกครั้ง');
         const data = snap.data();
         if (data.status !== 'waiting' || data.player2) throw new Error('ห้องนี้เริ่มเล่นไปแล้วหรือเต็มแล้ว');
+        const firstTurn = Math.random() < 0.5 ? 1 : 2;
         tx.update(ref, {
           player2: { name: name.slice(0, 16) },
           status: 'playing',
+          turn: firstTurn,
           updatedAt: serverTimestamp()
         });
       });
@@ -1621,9 +1623,10 @@
     resultRematchBtn.textContent = 'กำลังเริ่มใหม่…';
     try {
       const ref = doc(db, ROOMS_COLLECTION, currentRoomCode);
+      const firstTurn = Math.random() < 0.5 ? 1 : 2;
       await updateDoc(ref, {
         dots: {},
-        turn: 1,
+        turn: firstTurn,
         status: 'playing',
         winner: null,
         updatedAt: serverTimestamp()
