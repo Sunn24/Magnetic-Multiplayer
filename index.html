@@ -585,7 +585,7 @@
       <span class="label">Grid size</span>
       <div class="stepper">
         <button id="gridMinus" type="button" aria-label="ลดขนาดกริด">−</button>
-        <input class="value" id="gridSizeVal" type="number" inputmode="numeric" value="5" min="4" max="24" aria-label="ขนาดกริด">
+        <input class="value" id="gridSizeVal" type="number" inputmode="numeric" value="5" min="2" max="24" aria-label="ขนาดกริด">
         <button id="gridPlus" type="button" aria-label="เพิ่มขนาดกริด">+</button>
       </div>
     </div>
@@ -690,7 +690,7 @@
           <span class="label">Grid size</span>
           <div class="stepper">
             <button id="mpGridMinus" type="button">−</button>
-            <input class="value" id="mpGridVal" type="number" inputmode="numeric" value="5" min="4" max="24">
+            <input class="value" id="mpGridVal" type="number" inputmode="numeric" value="5" min="2" max="24">
             <button id="mpGridPlus" type="button">+</button>
           </div>
         </div>
@@ -822,7 +822,7 @@
   "use strict";
 
   // ---------- Config ----------
-  const GRID_MIN = 4, GRID_MAX = 24;
+  const GRID_MIN = 2, GRID_MAX = 24;
   const DIST_MIN = 1, DIST_MAX = 8;
 
   let M = 5;
